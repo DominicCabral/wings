@@ -4,9 +4,9 @@ const { load } = require("./p5.play/p5.play");
 
 // TODO:
 // - Set Boundaries on Player
-// - Levels
-// - Display Levels
 // - Clean up sprites off screen
+// - Clouds in Background
+// - Auto Increment Level
 
 type LevelConfig = {
   playerSpeed: number;
@@ -42,6 +42,12 @@ const DEFAULT_LEVELS: Levels = [
     spawnRateSec: 0.08,
     enemySize: 35,
   },
+  {
+    playerSpeed: 1,
+    enemiesSpeed: 8,
+    spawnRateSec: 0.05,
+    enemySize: 40,
+  },
 ];
 
 const sketch = (p5: p5Play) => {
@@ -61,11 +67,29 @@ const sketch = (p5: p5Play) => {
       this.levels = levels;
     }
 
+    private set modal(s: string) {
+      p5.fill(255);
+      p5.rect(p5.width / 2, p5.height / 2, 100, 50);
+      p5.textAlign(p5.CENTER, p5.CENTER);
+      p5.fill(0);
+      p5.text(s, p5.width / 2, p5.height / 2, 100, 50);
+    }
+
+    private displayLevel() {
+      p5.fill(255);
+      p5.rect(0, 0, 100, 50);
+      p5.textAlign(p5.CENTER, p5.CENTER);
+      p5.fill(0);
+      p5.text(`Level: ${this.currentLevel + 1}`, 0, 0, 100, 50);
+    }
+
     draw() {
       if (this.isGameOver || !this.gameStarted) {
+        this.modal = "Hit the spacebar";
         return;
       }
       p5.background(50);
+      this.displayLevel();
       this.player.draw();
       this.enemies.draw();
       this.player.collides(this.enemies, () => {
