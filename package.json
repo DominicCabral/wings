@@ -1,0 +1,13 @@
+{
+  "scripts": {
+    "build": "browserify ./src/index.ts -p [ tsify ] > dist/sketch.js"
+  },
+  "dependencies": {
+    "@types/p5": "^1.5.0",
+    "p5": "^1.5.0",
+    "tsify": "^5.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^18.13.0"
+  }
+}
