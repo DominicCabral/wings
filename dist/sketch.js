@@ -10,7 +10,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const p5_1 = __importDefault(require("p5"));
+const orientation_1 = require("./orientation");
+const levels_1 = require("./levels");
 const { load } = require("./p5.play/p5.play");
+// TODO:
+// - airplane hover sin wave
+// - sounds related to levels (birds from east, winds hard to control)
+// - explosion animation
+// - better displays
+// - harder levels, animations change
 let ANIMATIONS = {
     birds: {
         blue: {
@@ -21,12 +29,182 @@ let ANIMATIONS = {
         },
     },
 };
-const DEFAULT_LEVELS = [
+const sketch = (p5) => {
+    class Game {
+        constructor(levels) {
+            this.isGameOver = false;
+            this.gameStarted = false;
+            this.currentLevel = 0;
+            this.planesPassedTotal = 0;
+            this.planesPassedThisLevel = 0;
+            if (levels.length == 0) {
+                throw Error("Not enought levels");
+            }
+            this.levels = levels;
+            let blueBirdAnimation = p5.loadAnimation(ANIMATIONS.birds.blue.flapping.first, ANIMATIONS.birds.blue.flapping.total);
+            let redPlaneAnimation = p5.loadAnimation("assets/plane/red/nobank/1.png", 6);
+            blueBirdAnimation.frameDelay = 10;
+            this.blueBirdAnimation = blueBirdAnimation;
+            this.redPlaneAnimation = redPlaneAnimation;
+        }
+        set modal(s) {
+            p5.fill(255);
+            p5.rect(p5.width / 2, p5.height / 2, 100, 50);
+            p5.textAlign(p5.CENTER, p5.CENTER);
+            p5.fill(0);
+            p5.text(s, p5.width / 2, p5.height / 2, 100, 50);
+        }
+        displayLevel() {
+            p5.fill(255);
+            p5.rect(0, 0, 100, 50);
+            p5.textAlign(p5.CENTER, p5.CENTER);
+            p5.fill(0);
+            p5.text(`Level: ${this.currentLevel + 1}`, 0, 0, 100, 50);
+        }
+        displayPlanesPassedTotal() {
+            p5.fill(255);
+            p5.rect(100, 0, 100, 50);
+            p5.textAlign(p5.CENTER, p5.CENTER);
+            p5.fill(0);
+            p5.text(`Planes Passed: ${this.planesPassedTotal}`, 100, 0, 100, 50);
+        }
+        displayPlanesPassedThisLevel() {
+            p5.fill(255);
+            p5.rect(200, 0, 100, 50);
+            p5.textAlign(p5.CENTER, p5.CENTER);
+            p5.fill(0);
+            p5.text(`Passed This Level: ${this.planesPassedThisLevel}/${this.config.planesToPass}`, 200, 0, 100, 50);
+        }
+        draw() {
+            if (this.isGameOver || !this.gameStarted) {
+                this.modal = "Start";
+                return;
+            }
+            p5.background("#87ceeb");
+            this.clouds.draw();
+            this.displayLevel();
+            this.displayPlanesPassedTotal();
+            this.displayPlanesPassedThisLevel();
+            this.player.draw();
+            this.birds.draw();
+            this.player.moveTowards(p5.mouseX, p5.mouseY - 50, this.config.playerSpeed);
+            this.player.collides(this.birds, () => {
+                this.endGame();
+            });
+            this.birds.cull(0, 0, 0, 0, (sprite) => {
+                sprite.remove();
+                this.incPlanesPassed();
+            });
+            this.birds.debug = p5.mouse.pressing();
+            this.player.debug = p5.mouse.pressing();
+        }
+        get config() {
+            return this.levels[this.currentLevel];
+        }
+        incPlanesPassed() {
+            this.planesPassedTotal++;
+            this.planesPassedThisLevel++;
+            if (this.planesPassedThisLevel == this.config.planesToPass) {
+                this.nextLevel();
+            }
+        }
+        nextLevel() {
+            if (this.isGameOver) {
+                return;
+            }
+            // Next Level
+            if (this.levels.length == this.currentLevel + 1) {
+                this.endGame();
+                return;
+            }
+            this.currentLevel++;
+            this.planesPassedThisLevel = 0;
+        }
+        requestToStart() {
+            if (this.isGameOver) {
+                this.birds.removeAll();
+                this.isGameOver = false;
+                this.startPlaneSpawning();
+                this.startCloudSpawning();
+                return;
+            }
+            if (!this.gameStarted) {
+                this.start();
+                return;
+            }
+        }
+        createPlayer() {
+            let player = p5.createSprite(p5.width / 2, p5.height - 50, 40, "kinematic");
+            player.diameter = 40;
+            player.addAni("nobank", this.redPlaneAnimation);
+            return player;
+        }
+        start() {
+            this.birds = p5.createGroup();
+            this.birds.addAni("fly", this.blueBirdAnimation);
+            this.player = this.createPlayer();
+            this.clouds = p5.createGroup();
+            this.player.overlaps(this.clouds);
+            this.birds.overlaps(this.clouds);
+            this.gameStarted = true;
+            this.startPlaneSpawning();
+            this.startCloudSpawning();
+        }
+        endGame() {
+            console.log("GAME OVER");
+            this.isGameOver = true;
+            this.currentLevel = 0;
+            this.planesPassedTotal = 0;
+            this.planesPassedThisLevel = 0;
+            clearInterval(this.birdSpawnTimer);
+            clearInterval(this.cloudSpawnTimer);
+        }
+        startPlaneSpawning() {
+            this.birdSpawnTimer = setInterval(() => {
+                let orientation = (0, orientation_1.orientationConfig)(p5)[p5.random(this.config.birdSpawnDirections)];
+                let g = new this.birds.GroupSprite(orientation.x(), orientation.y(), 25);
+                g.direction = orientation.direction;
+                g.speed = this.config.planesSpeed;
+                g.rotation = orientation.rotation;
+            }, 1000 * this.config.spawnRateSec);
+        }
+        startCloudSpawning() {
+            this.cloudSpawnTimer = setInterval(() => {
+                let g = p5.createSprite(p5.random(0, p5.width), -100, 100);
+                g.direction = 90;
+                g.speed = this.config.planesSpeed / 2;
+                g.img = "assets/cloud.png";
+                g.rotation = 90;
+                this.clouds.push(g);
+            }, 1000 * this.config.spawnRateSec * 2);
+        }
+    }
+    let game = new Game(levels_1.DEFAULT_LEVELS);
+    p5.setup = () => {
+        p5.createCanvas(p5.windowWidth, p5.windowHeight);
+    };
+    p5.draw = () => {
+        game.draw();
+    };
+    p5.mouseClicked = () => {
+        game.requestToStart();
+    };
+    p5.touchStarted = () => {
+        game.requestToStart();
+    };
+};
+load(p5_1.default);
+new p5_1.default(sketch);
+
+},{"./levels":3,"./orientation":4,"./p5.play/p5.play":5,"p5":1}],3:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.DEFAULT_LEVELS = void 0;
+exports.DEFAULT_LEVELS = [
     {
         playerSpeed: 0.1,
         planesSpeed: 4,
         spawnRateSec: 0.5,
-        enemySize: 20,
         planesToPass: 25,
         birdSpawnDirections: ["north"],
     },
@@ -34,7 +212,6 @@ const DEFAULT_LEVELS = [
         playerSpeed: 0.08,
         planesSpeed: 5,
         spawnRateSec: 0.1,
-        enemySize: 24,
         planesToPass: 25,
         birdSpawnDirections: ["north"],
     },
@@ -42,7 +219,6 @@ const DEFAULT_LEVELS = [
         playerSpeed: 0.06,
         planesSpeed: 6,
         spawnRateSec: 0.07,
-        enemySize: 30,
         planesToPass: 25,
         birdSpawnDirections: ["north", "east"],
     },
@@ -50,7 +226,6 @@ const DEFAULT_LEVELS = [
         playerSpeed: 0.04,
         planesSpeed: 7,
         spawnRateSec: 0.03,
-        enemySize: 35,
         planesToPass: 25,
         birdSpawnDirections: ["north", "east"],
     },
@@ -58,7 +233,6 @@ const DEFAULT_LEVELS = [
         playerSpeed: 0.03,
         planesSpeed: 8,
         spawnRateSec: 0.005,
-        enemySize: 40,
         planesToPass: 25,
         birdSpawnDirections: ["north", "east", "west"],
     },
@@ -66,13 +240,17 @@ const DEFAULT_LEVELS = [
         playerSpeed: 0.01,
         planesSpeed: 10,
         spawnRateSec: 0.001,
-        enemySize: 40,
         planesToPass: 25,
         birdSpawnDirections: ["north", "east", "west", "south"],
     },
 ];
-const sketch = (p5) => {
-    const ORIENTATION_CONFIG = {
+
+},{}],4:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.orientationConfig = void 0;
+function orientationConfig(p5) {
+    return {
         west: {
             direction: 0,
             x: () => {
@@ -114,171 +292,10 @@ const sketch = (p5) => {
             rotation: 0,
         },
     };
-    class Game {
-        constructor(levels) {
-            this.isGameOver = false;
-            this.gameStarted = false;
-            this.currentLevel = 0;
-            this.planesPassedTotal = 0;
-            this.planesPassedThisLevel = 0;
-            if (levels.length == 0) {
-                throw Error("Not enought levels");
-            }
-            this.levels = levels;
-            let blueBirdAnimation = p5.loadAnimation("assets/birds/blue/flapping/000.png", 9);
-            blueBirdAnimation.frameDelay = 10;
-            this.blueBirdAnimation = blueBirdAnimation;
-        }
-        set modal(s) {
-            p5.fill(255);
-            p5.rect(p5.width / 2, p5.height / 2, 100, 50);
-            p5.textAlign(p5.CENTER, p5.CENTER);
-            p5.fill(0);
-            p5.text(s, p5.width / 2, p5.height / 2, 100, 50);
-        }
-        displayLevel() {
-            p5.fill(255);
-            p5.rect(0, 0, 100, 50);
-            p5.textAlign(p5.CENTER, p5.CENTER);
-            p5.fill(0);
-            p5.text(`Level: ${this.currentLevel + 1}`, 0, 0, 100, 50);
-        }
-        dispalyPlanesPassedTotal() {
-            p5.fill(255);
-            p5.rect(100, 0, 100, 50);
-            p5.textAlign(p5.CENTER, p5.CENTER);
-            p5.fill(0);
-            p5.text(`Planes Passed: ${this.planesPassedTotal}`, 100, 0, 100, 50);
-        }
-        displayPlanesPassedThisLevel() {
-            p5.fill(255);
-            p5.rect(200, 0, 100, 50);
-            p5.textAlign(p5.CENTER, p5.CENTER);
-            p5.fill(0);
-            p5.text(`Passed This Level: ${this.planesPassedThisLevel}/${this.config.planesToPass}`, 200, 0, 100, 50);
-        }
-        draw() {
-            if (this.isGameOver || !this.gameStarted) {
-                this.modal = "Start";
-                return;
-            }
-            p5.background("#87ceeb");
-            this.clouds.draw();
-            this.displayLevel();
-            this.dispalyPlanesPassedTotal();
-            this.displayPlanesPassedThisLevel();
-            this.player.draw();
-            this.birds.draw();
-            this.player.moveTowards(p5.mouseX, p5.mouseY - 50, this.config.playerSpeed);
-            this.player.collides(this.birds, () => {
-                this.endGame();
-            });
-            this.birds.cull(0, 0, 0, 0, (sprite) => {
-                sprite.remove();
-                this.incPlanesPassed();
-            });
-        }
-        get config() {
-            return this.levels[this.currentLevel];
-        }
-        incPlanesPassed() {
-            this.planesPassedTotal++;
-            this.planesPassedThisLevel++;
-            if (this.planesPassedThisLevel == this.config.planesToPass) {
-                this.nextLevel();
-            }
-        }
-        nextLevel() {
-            if (this.isGameOver) {
-                return;
-            }
-            // Next Level
-            if (this.levels.length == this.currentLevel + 1) {
-                this.endGame();
-                return;
-            }
-            this.currentLevel++;
-            this.planesPassedThisLevel = 0;
-        }
-        requestToStart() {
-            if (this.isGameOver) {
-                this.birds.removeAll();
-                this.isGameOver = false;
-                this.startPlaneSpawning();
-                this.startCloudSpawning();
-                return;
-            }
-            if (!this.gameStarted) {
-                this.start();
-                return;
-            }
-        }
-        createPlayer() {
-            let player = p5.createSprite(p5.width / 2, p5.height - 50, 40, "kinematic");
-            player.img = "assets/plane.png";
-            player.diameter = 40;
-            return player;
-        }
-        start() {
-            this.birds = p5.createGroup();
-            this.birds.addAni("fly", this.blueBirdAnimation);
-            this.player = this.createPlayer();
-            this.clouds = p5.createGroup();
-            this.player.overlaps(this.clouds);
-            this.birds.overlaps(this.clouds);
-            this.gameStarted = true;
-            this.startPlaneSpawning();
-            this.startCloudSpawning();
-        }
-        endGame() {
-            console.log("GAME OVER");
-            this.isGameOver = true;
-            this.currentLevel = 0;
-            this.planesPassedTotal = 0;
-            this.planesPassedThisLevel = 0;
-            clearInterval(this.birdSpawnTimer);
-            clearInterval(this.cloudSpawnTimer);
-        }
-        startPlaneSpawning() {
-            this.birdSpawnTimer = setInterval(() => {
-                let orientation = ORIENTATION_CONFIG[p5.random(this.config.birdSpawnDirections)];
-                let g = new this.birds.GroupSprite(orientation.x(), orientation.y(), this.config.enemySize);
-                g.direction = orientation.direction;
-                g.speed = this.config.planesSpeed;
-                g.diameter = this.config.enemySize;
-                g.rotation = orientation.rotation;
-            }, 1000 * this.config.spawnRateSec);
-        }
-        startCloudSpawning() {
-            this.cloudSpawnTimer = setInterval(() => {
-                let g = p5.createSprite(p5.random(0, p5.width), -100, this.config.enemySize);
-                g.direction = 90;
-                g.speed = this.config.planesSpeed / 2;
-                g.img = "assets/cloud.png";
-                g.diameter = this.config.enemySize;
-                g.rotation = 90;
-                this.clouds.push(g);
-            }, 1000 * this.config.spawnRateSec * 2);
-        }
-    }
-    let game = new Game(DEFAULT_LEVELS);
-    p5.setup = () => {
-        p5.createCanvas(p5.windowWidth, p5.windowHeight);
-    };
-    p5.draw = () => {
-        game.draw();
-    };
-    p5.mouseClicked = () => {
-        game.requestToStart();
-    };
-    p5.touchStarted = () => {
-        game.requestToStart();
-    };
-};
-load(p5_1.default);
-new p5_1.default(sketch);
+}
+exports.orientationConfig = orientationConfig;
 
-},{"./p5.play/p5.play":3,"p5":1}],3:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {

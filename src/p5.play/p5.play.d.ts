@@ -3,6 +3,7 @@ import p5 from "p5";
 export class Group {
   GroupSprite: any;
   ani: string;
+  debug: any;
   push(s: Sprite);
   draw();
   removeAll();
@@ -33,6 +34,7 @@ export class Sprite {
   diameter: number;
   collider: Collider;
   rotation: number;
+  debug: any;
   addAni(name: string, animation: any);
   changeAni(l: string);
   draw();
@@ -41,6 +43,10 @@ export class Sprite {
   move(n: number, s: string, v: number);
   remove();
   moveTowards(x: number, y: number, amount: number);
+}
+
+export class Mouse {
+  pressing();
 }
 
 export class p5Play extends p5 {
@@ -60,4 +66,6 @@ export class p5Play extends p5 {
   createSprite(x: number, y: number, w: number): Sprite;
 
   loadAnimation(...args);
+
+  mouse: Mouse;
 }

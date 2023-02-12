@@ -1,20 +1,15 @@
 import { Group, Sprite, p5Play } from "./p5.play/p5.play";
 import p5 from "p5";
+import { orientationConfig } from "./orientation";
+import { DEFAULT_LEVELS, LevelConfig, Levels } from "./levels";
 const { load } = require("./p5.play/p5.play");
 
 // TODO:
 // - airplane hover sin wave
-// - sounds
+// - sounds related to levels (birds from east, winds hard to control)
 // - explosion animation
-
-type LevelConfig = {
-  playerSpeed: number;
-  planesSpeed: number;
-  spawnRateSec: number;
-  birdSpawnDirections: Orientation[];
-  enemySize: number;
-  planesToPass: number;
-};
+// - better displays
+// - harder levels, animations change
 
 let ANIMATIONS = {
   birds: {
@@ -27,110 +22,7 @@ let ANIMATIONS = {
   },
 };
 
-type OrientationConfig = {
-  direction: number;
-  x: () => number;
-  y: () => number;
-  rotation: number;
-};
-
-type Orientation = "north" | "west" | "east" | "south";
-
-type Levels = LevelConfig[];
-const DEFAULT_LEVELS: Levels = [
-  {
-    playerSpeed: 0.1,
-    planesSpeed: 4,
-    spawnRateSec: 0.5,
-    enemySize: 20,
-    planesToPass: 25,
-    birdSpawnDirections: ["north"],
-  },
-  {
-    playerSpeed: 0.08,
-    planesSpeed: 5,
-    spawnRateSec: 0.1,
-    enemySize: 24,
-    planesToPass: 25,
-    birdSpawnDirections: ["north"],
-  },
-  {
-    playerSpeed: 0.06,
-    planesSpeed: 6,
-    spawnRateSec: 0.07,
-    enemySize: 30,
-    planesToPass: 25,
-    birdSpawnDirections: ["north", "east"],
-  },
-  {
-    playerSpeed: 0.04,
-    planesSpeed: 7,
-    spawnRateSec: 0.03,
-    enemySize: 35,
-    planesToPass: 25,
-    birdSpawnDirections: ["north", "east"],
-  },
-  {
-    playerSpeed: 0.03,
-    planesSpeed: 8,
-    spawnRateSec: 0.005,
-    enemySize: 40,
-    planesToPass: 25,
-    birdSpawnDirections: ["north", "east", "west"],
-  },
-  {
-    playerSpeed: 0.01,
-    planesSpeed: 10,
-    spawnRateSec: 0.001,
-    enemySize: 40,
-    planesToPass: 25,
-    birdSpawnDirections: ["north", "east", "west", "south"],
-  },
-];
-
 const sketch = (p5: p5Play) => {
-  const ORIENTATION_CONFIG: Record<Orientation, OrientationConfig> = {
-    west: {
-      direction: 0,
-      x: () => {
-        return 0;
-      },
-      y: () => {
-        return p5.random(0, p5.height);
-      },
-      rotation: 90,
-    },
-    north: {
-      direction: 90,
-      x: () => {
-        return p5.random(0, p5.width);
-      },
-      y: () => {
-        return 0;
-      },
-      rotation: 180,
-    },
-    east: {
-      direction: 180,
-      x: () => {
-        return p5.width;
-      },
-      y: () => {
-        return p5.random(0, p5.height);
-      },
-      rotation: 270,
-    },
-    south: {
-      direction: 270,
-      x: () => {
-        return p5.random(0, p5.width);
-      },
-      y: () => {
-        return p5.height;
-      },
-      rotation: 0,
-    },
-  };
   class Game {
     private isGameOver = false;
     private gameStarted = false;
@@ -144,6 +36,7 @@ const sketch = (p5: p5Play) => {
     private planesPassedTotal: number = 0;
     private planesPassedThisLevel: number = 0;
     private blueBirdAnimation: any;
+    private redPlaneAnimation: any;
 
     constructor(levels: Levels) {
       if (levels.length == 0) {
@@ -152,13 +45,19 @@ const sketch = (p5: p5Play) => {
       this.levels = levels;
 
       let blueBirdAnimation = p5.loadAnimation(
-        "assets/birds/blue/flapping/000.png",
-        9
+        ANIMATIONS.birds.blue.flapping.first,
+        ANIMATIONS.birds.blue.flapping.total
+      );
+
+      let redPlaneAnimation = p5.loadAnimation(
+        "assets/plane/red/nobank/1.png",
+        6
       );
 
       blueBirdAnimation.frameDelay = 10;
 
       this.blueBirdAnimation = blueBirdAnimation;
+      this.redPlaneAnimation = redPlaneAnimation;
     }
 
     private set modal(s: string) {
@@ -177,7 +76,7 @@ const sketch = (p5: p5Play) => {
       p5.text(`Level: ${this.currentLevel + 1}`, 0, 0, 100, 50);
     }
 
-    private dispalyPlanesPassedTotal() {
+    private displayPlanesPassedTotal() {
       p5.fill(255);
       p5.rect(100, 0, 100, 50);
       p5.textAlign(p5.CENTER, p5.CENTER);
@@ -207,7 +106,7 @@ const sketch = (p5: p5Play) => {
       p5.background("#87ceeb");
       this.clouds.draw();
       this.displayLevel();
-      this.dispalyPlanesPassedTotal();
+      this.displayPlanesPassedTotal();
       this.displayPlanesPassedThisLevel();
       this.player.draw();
       this.birds.draw();
@@ -223,6 +122,9 @@ const sketch = (p5: p5Play) => {
         sprite.remove();
         this.incPlanesPassed();
       });
+
+      this.birds.debug = p5.mouse.pressing();
+      this.player.debug = p5.mouse.pressing();
     }
 
     private get config(): LevelConfig {
@@ -273,8 +175,8 @@ const sketch = (p5: p5Play) => {
         40,
         "kinematic"
       );
-      player.img = "assets/plane.png";
       player.diameter = 40;
+      player.addAni("nobank", this.redPlaneAnimation);
       return player;
     }
 
@@ -303,31 +205,25 @@ const sketch = (p5: p5Play) => {
     private startPlaneSpawning() {
       this.birdSpawnTimer = setInterval(() => {
         let orientation =
-          ORIENTATION_CONFIG[p5.random(this.config.birdSpawnDirections)];
+          orientationConfig(p5)[p5.random(this.config.birdSpawnDirections)];
 
         let g = new this.birds.GroupSprite(
           orientation.x(),
           orientation.y(),
-          this.config.enemySize
+          25
         );
         g.direction = orientation.direction;
         g.speed = this.config.planesSpeed;
-        g.diameter = this.config.enemySize;
         g.rotation = orientation.rotation;
       }, 1000 * this.config.spawnRateSec);
     }
 
     private startCloudSpawning() {
       this.cloudSpawnTimer = setInterval(() => {
-        let g = p5.createSprite(
-          p5.random(0, p5.width),
-          -100,
-          this.config.enemySize
-        );
+        let g = p5.createSprite(p5.random(0, p5.width), -100, 100);
         g.direction = 90;
         g.speed = this.config.planesSpeed / 2;
         g.img = "assets/cloud.png";
-        g.diameter = this.config.enemySize;
         g.rotation = 90;
         this.clouds.push(g);
       }, 1000 * this.config.spawnRateSec * 2);
