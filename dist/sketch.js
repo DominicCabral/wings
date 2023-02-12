@@ -19,6 +19,7 @@ const { load } = require("./p5.play/p5.play");
 // - explosion animation
 // - better displays
 // - harder levels, animations change
+// - airplane animation banking
 let ANIMATIONS = {
     birds: {
         blue: {
@@ -95,8 +96,8 @@ const sketch = (p5) => {
                 sprite.remove();
                 this.incPlanesPassed();
             });
-            this.birds.debug = p5.mouse.pressing();
-            this.player.debug = p5.mouse.pressing();
+            this.birds.debug = p5.kb.presses("d");
+            this.player.debug = p5.kb.presses("d");
         }
         get config() {
             return this.levels[this.currentLevel];

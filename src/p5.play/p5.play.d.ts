@@ -35,6 +35,7 @@ export class Sprite {
   collider: Collider;
   rotation: number;
   debug: any;
+  ani: any;
   addAni(name: string, animation: any);
   changeAni(l: string);
   draw();
@@ -50,6 +51,7 @@ export class Mouse {
 }
 
 export class p5Play extends p5 {
+  kb: any;
   createGroup(): Group;
   createSprite(x: number, y: number, w: number, h: number): Sprite;
 
