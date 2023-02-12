@@ -8,8 +8,8 @@ const { load } = require("./p5.play/p5.play");
 // - airplane hover sin wave
 // - sounds related to levels (birds from east, winds hard to control)
 // - explosion animation
-// - better displays
-// - harder levels, animations change
+// - better displays for levels
+// - when getting to harder levels, animations change
 // - airplane animation banking
 
 let ANIMATIONS = {
@@ -113,7 +113,7 @@ const sketch = (p5: p5Play) => {
       this.birds.draw();
       this.player.moveTowards(
         p5.mouseX,
-        p5.mouseY - 50,
+        p5.mouseY - 75,
         this.config.playerSpeed
       );
       this.player.collides(this.birds, () => {
@@ -123,9 +123,6 @@ const sketch = (p5: p5Play) => {
         sprite.remove();
         this.incPlanesPassed();
       });
-
-      this.birds.debug = p5.kb.presses("d");
-      this.player.debug = p5.kb.presses("d");
     }
 
     private get config(): LevelConfig {
@@ -189,6 +186,8 @@ const sketch = (p5: p5Play) => {
       this.player.overlaps(this.clouds);
       this.birds.overlaps(this.clouds);
       this.gameStarted = true;
+      this.birds.debug = p5.kb.presses("d");
+      this.player.debug = p5.kb.presses("d");
       this.startPlaneSpawning();
       this.startCloudSpawning();
     }
