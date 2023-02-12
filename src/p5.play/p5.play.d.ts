@@ -5,6 +5,15 @@ export class Group {
   push(s: Sprite);
   draw();
   removeAll();
+  collides(s: Sprite, f: (s: Sprite) => void);
+  overlaps(g: Group);
+  cull(
+    top: number,
+    bottom: number,
+    l: number,
+    r: number,
+    cb: (s: Sprite) => void
+  );
 }
 
 type Collider = "static" | "kinematic" | "dynamic" | "none";
@@ -13,8 +22,21 @@ export class Sprite {
   direction: number;
   speed: number;
   shapeColor: any;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  img: string;
+  layer: number;
+  diameter: number;
+  collider: Collider;
+  rotation: number;
   draw();
+  overlaps(g: Group);
   collides(g: Group, f: () => void);
+  move(n: number, s: string, v: number);
+  remove();
+  moveTowards(x: number, y: number, amount: number);
 }
 
 export class p5Play extends p5 {
