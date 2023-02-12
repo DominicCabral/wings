@@ -1,12 +1,14 @@
 import p5 from "p5";
 
 export class Group {
-  constructor();
+  GroupSprite: any;
+  ani: string;
   push(s: Sprite);
   draw();
   removeAll();
   collides(s: Sprite, f: (s: Sprite) => void);
   overlaps(g: Group);
+  addAni(name: string, animation: any);
   cull(
     top: number,
     bottom: number,
@@ -31,6 +33,8 @@ export class Sprite {
   diameter: number;
   collider: Collider;
   rotation: number;
+  addAni(name: string, animation: any);
+  changeAni(l: string);
   draw();
   overlaps(g: Group);
   collides(g: Group, f: () => void);
@@ -54,4 +58,6 @@ export class p5Play extends p5 {
   createSprite(x: number, y: number, w: number, collider: Collider): Sprite;
 
   createSprite(x: number, y: number, w: number): Sprite;
+
+  loadAnimation(...args);
 }

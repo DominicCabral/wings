@@ -3,75 +3,162 @@ import p5 from "p5";
 const { load } = require("./p5.play/p5.play");
 
 // TODO:
-// - Set Boundaries on Player
-// - enemies from other directions
+// - airplane hover sin wave
+// - sounds
+// - explosion animation
 
 type LevelConfig = {
   playerSpeed: number;
-  enemiesSpeed: number;
+  planesSpeed: number;
   spawnRateSec: number;
+  birdSpawnDirections: Orientation[];
   enemySize: number;
-  enemiesToPass: number;
+  planesToPass: number;
 };
+
+let ANIMATIONS = {
+  birds: {
+    blue: {
+      flapping: {
+        first: "assets/birds/blue/flapping/000.png",
+        total: 9,
+      },
+    },
+  },
+};
+
+type OrientationConfig = {
+  direction: number;
+  x: () => number;
+  y: () => number;
+  rotation: number;
+};
+
+type Orientation = "north" | "west" | "east" | "south";
 
 type Levels = LevelConfig[];
 const DEFAULT_LEVELS: Levels = [
   {
-    playerSpeed: 1,
-    enemiesSpeed: 4,
+    playerSpeed: 0.1,
+    planesSpeed: 4,
     spawnRateSec: 0.5,
     enemySize: 20,
-    enemiesToPass: 25,
+    planesToPass: 25,
+    birdSpawnDirections: ["north"],
   },
   {
-    playerSpeed: 0.5,
-    enemiesSpeed: 5,
-    spawnRateSec: 0.3,
-    enemySize: 24,
-    enemiesToPass: 25,
-  },
-  {
-    playerSpeed: 0.1,
-    enemiesSpeed: 6,
+    playerSpeed: 0.08,
+    planesSpeed: 5,
     spawnRateSec: 0.1,
-    enemySize: 30,
-    enemiesToPass: 25,
+    enemySize: 24,
+    planesToPass: 25,
+    birdSpawnDirections: ["north"],
   },
   {
-    playerSpeed: 0.05,
-    enemiesSpeed: 7,
-    spawnRateSec: 0.08,
+    playerSpeed: 0.06,
+    planesSpeed: 6,
+    spawnRateSec: 0.07,
+    enemySize: 30,
+    planesToPass: 25,
+    birdSpawnDirections: ["north", "east"],
+  },
+  {
+    playerSpeed: 0.04,
+    planesSpeed: 7,
+    spawnRateSec: 0.03,
     enemySize: 35,
-    enemiesToPass: 25,
+    planesToPass: 25,
+    birdSpawnDirections: ["north", "east"],
   },
   {
     playerSpeed: 0.03,
-    enemiesSpeed: 8,
-    spawnRateSec: 0.05,
+    planesSpeed: 8,
+    spawnRateSec: 0.005,
     enemySize: 40,
-    enemiesToPass: 25,
+    planesToPass: 25,
+    birdSpawnDirections: ["north", "east", "west"],
+  },
+  {
+    playerSpeed: 0.01,
+    planesSpeed: 10,
+    spawnRateSec: 0.001,
+    enemySize: 40,
+    planesToPass: 25,
+    birdSpawnDirections: ["north", "east", "west", "south"],
   },
 ];
 
 const sketch = (p5: p5Play) => {
+  const ORIENTATION_CONFIG: Record<Orientation, OrientationConfig> = {
+    west: {
+      direction: 0,
+      x: () => {
+        return 0;
+      },
+      y: () => {
+        return p5.random(0, p5.height);
+      },
+      rotation: 90,
+    },
+    north: {
+      direction: 90,
+      x: () => {
+        return p5.random(0, p5.width);
+      },
+      y: () => {
+        return 0;
+      },
+      rotation: 180,
+    },
+    east: {
+      direction: 180,
+      x: () => {
+        return p5.width;
+      },
+      y: () => {
+        return p5.random(0, p5.height);
+      },
+      rotation: 270,
+    },
+    south: {
+      direction: 270,
+      x: () => {
+        return p5.random(0, p5.width);
+      },
+      y: () => {
+        return p5.height;
+      },
+      rotation: 0,
+    },
+  };
   class Game {
     private isGameOver = false;
     private gameStarted = false;
     private player: Sprite;
-    private enemies: Group;
+    private birds: Group;
     private clouds: Group;
-    private enemySpawnTimer: NodeJS.Timer;
+    private birdSpawnTimer: NodeJS.Timer;
     private cloudSpawnTimer: NodeJS.Timer;
     private currentLevel: number = 0;
     private levels: Levels;
-    private enemiesPassedTotal: number = 0;
-    private enemiesPassedThisLevel: number = 0;
+    private planesPassedTotal: number = 0;
+    private planesPassedThisLevel: number = 0;
+    private blueBirdAnimation: any;
 
     constructor(levels: Levels) {
       if (levels.length == 0) {
         throw Error("Not enought levels");
       }
       this.levels = levels;
+
+      let blueBirdAnimation = p5.loadAnimation(
+        "assets/birds/blue/flapping/000.png",
+        9
+      );
+
+      blueBirdAnimation.frameDelay = 10;
+
+      this.blueBirdAnimation = blueBirdAnimation;
     }
 
     private set modal(s: string) {
@@ -90,24 +177,24 @@ const sketch = (p5: p5Play) => {
       p5.text(`Level: ${this.currentLevel + 1}`, 0, 0, 100, 50);
     }
 
-    private dispalyEnemiesPassedTotal() {
+    private dispalyPlanesPassedTotal() {
       p5.fill(255);
       p5.rect(100, 0, 100, 50);
       p5.textAlign(p5.CENTER, p5.CENTER);
       p5.fill(0);
-      p5.text(`Enemies Passed: ${this.enemiesPassedTotal}`, 100, 0, 100, 50);
+      p5.text(`Planes Passed: ${this.planesPassedTotal}`, 100, 0, 100, 50);
     }
 
-    private dispalyEnemiesPassedThisLevel() {
+    private displayPlanesPassedThisLevel() {
       p5.fill(255);
-      p5.rect(200, 0, 200, 50);
+      p5.rect(200, 0, 100, 50);
       p5.textAlign(p5.CENTER, p5.CENTER);
       p5.fill(0);
       p5.text(
-        `Passed This Level: ${this.enemiesPassedThisLevel}/${this.config.enemiesToPass}`,
+        `Passed This Level: ${this.planesPassedThisLevel}/${this.config.planesToPass}`,
         200,
         0,
-        200,
+        100,
         50
       );
     }
@@ -120,21 +207,21 @@ const sketch = (p5: p5Play) => {
       p5.background("#87ceeb");
       this.clouds.draw();
       this.displayLevel();
-      this.dispalyEnemiesPassedTotal();
-      this.dispalyEnemiesPassedThisLevel();
+      this.dispalyPlanesPassedTotal();
+      this.displayPlanesPassedThisLevel();
       this.player.draw();
-      this.enemies.draw();
+      this.birds.draw();
       this.player.moveTowards(
         p5.mouseX,
         p5.mouseY - 50,
         this.config.playerSpeed
       );
-      this.player.collides(this.enemies, () => {
+      this.player.collides(this.birds, () => {
         this.endGame();
       });
-      this.enemies.cull(0, 0, 0, 0, (sprite) => {
+      this.birds.cull(0, 0, 0, 0, (sprite) => {
         sprite.remove();
-        this.incEnemiesPassed();
+        this.incPlanesPassed();
       });
     }
 
@@ -142,11 +229,11 @@ const sketch = (p5: p5Play) => {
       return this.levels[this.currentLevel];
     }
 
-    private incEnemiesPassed() {
-      this.enemiesPassedTotal++;
-      this.enemiesPassedThisLevel++;
+    private incPlanesPassed() {
+      this.planesPassedTotal++;
+      this.planesPassedThisLevel++;
 
-      if (this.enemiesPassedThisLevel == this.config.enemiesToPass) {
+      if (this.planesPassedThisLevel == this.config.planesToPass) {
         this.nextLevel();
       }
     }
@@ -161,14 +248,14 @@ const sketch = (p5: p5Play) => {
         return;
       }
       this.currentLevel++;
-      this.enemiesPassedThisLevel = 0;
+      this.planesPassedThisLevel = 0;
     }
 
     requestToStart() {
       if (this.isGameOver) {
-        this.enemies.removeAll();
+        this.birds.removeAll();
         this.isGameOver = false;
-        this.startEnemySpawning();
+        this.startPlaneSpawning();
         this.startCloudSpawning();
         return;
       }
@@ -178,10 +265,6 @@ const sketch = (p5: p5Play) => {
         return;
       }
     }
-    // keyReleased() {
-    //   this.player.speed = 0;
-    //   this.player.direction = 0;
-    // }
 
     private createPlayer() {
       let player = p5.createSprite(
@@ -196,13 +279,14 @@ const sketch = (p5: p5Play) => {
     }
 
     private start() {
-      this.enemies = p5.createGroup();
+      this.birds = p5.createGroup();
+      this.birds.addAni("fly", this.blueBirdAnimation);
       this.player = this.createPlayer();
       this.clouds = p5.createGroup();
       this.player.overlaps(this.clouds);
-      this.enemies.overlaps(this.clouds);
+      this.birds.overlaps(this.clouds);
       this.gameStarted = true;
-      this.startEnemySpawning();
+      this.startPlaneSpawning();
       this.startCloudSpawning();
     }
 
@@ -210,25 +294,26 @@ const sketch = (p5: p5Play) => {
       console.log("GAME OVER");
       this.isGameOver = true;
       this.currentLevel = 0;
-      this.enemiesPassedTotal = 0;
-      this.enemiesPassedThisLevel = 0;
-      clearInterval(this.enemySpawnTimer);
+      this.planesPassedTotal = 0;
+      this.planesPassedThisLevel = 0;
+      clearInterval(this.birdSpawnTimer);
       clearInterval(this.cloudSpawnTimer);
     }
 
-    private startEnemySpawning() {
-      this.enemySpawnTimer = setInterval(() => {
-        let g = p5.createSprite(
-          p5.random(0, p5.width),
-          0,
+    private startPlaneSpawning() {
+      this.birdSpawnTimer = setInterval(() => {
+        let orientation =
+          ORIENTATION_CONFIG[p5.random(this.config.birdSpawnDirections)];
+
+        let g = new this.birds.GroupSprite(
+          orientation.x(),
+          orientation.y(),
           this.config.enemySize
         );
-        g.direction = 90;
-        g.speed = this.config.enemiesSpeed;
-        g.img = "assets/plane.png";
+        g.direction = orientation.direction;
+        g.speed = this.config.planesSpeed;
         g.diameter = this.config.enemySize;
-        g.rotation = 180;
-        this.enemies.push(g);
+        g.rotation = orientation.rotation;
       }, 1000 * this.config.spawnRateSec);
     }
 
@@ -240,7 +325,7 @@ const sketch = (p5: p5Play) => {
           this.config.enemySize
         );
         g.direction = 90;
-        g.speed = this.config.enemiesSpeed / 2;
+        g.speed = this.config.planesSpeed / 2;
         g.img = "assets/cloud.png";
         g.diameter = this.config.enemySize;
         g.rotation = 90;
