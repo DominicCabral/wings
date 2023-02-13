@@ -55,14 +55,14 @@ export const DEFAULT_LEVELS: Levels = [
     planesSpeed: 4,
     spawnRateSec: 0.5,
     birdsToPass: 25,
-    birdSpawnDirections: ["north", "east", "west"],
+    birdSpawnDirections: ["north"],
   },
   {
     playerSpeed: 0.08,
     planesSpeed: 5,
     spawnRateSec: 0.1,
     birdsToPass: 25,
-    birdSpawnDirections: ["north", "east", "west"],
+    birdSpawnDirections: ["north"],
   },
   {
     playerSpeed: 0.06,
