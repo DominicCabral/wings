@@ -20,10 +20,18 @@ const sketch = (p5: p5Play) => {
           first: "assets/birds/blue/flapping/000.png",
           total: 9,
         },
+        die: {
+          first: "assets/birds/blue/die/000.png",
+          total: 9,
+        },
       },
       brown: {
         flapping: {
           first: "assets/birds/brown/flapping/000.png",
+          total: 9,
+        },
+        die: {
+          first: "assets/birds/brown/die/000.png",
           total: 9,
         },
       },
@@ -32,15 +40,24 @@ const sketch = (p5: p5Play) => {
           first: "assets/birds/canary/flapping/000.png",
           total: 9,
         },
+        die: {
+          first: "assets/birds/canary/die/000.png",
+          total: 9,
+        },
       },
       green: {
         flapping: {
           first: "assets/birds/green/flapping/000.png",
           total: 9,
         },
+        die: {
+          first: "assets/birds/green/die/000.png",
+          total: 9,
+        },
       },
     },
   };
+
   class Birds {
     private birdSpawnTimer: NodeJS.Timer;
     private birdsPassedTotal: number = 0;
@@ -58,7 +75,16 @@ const sketch = (p5: p5Play) => {
           ANIMATIONS.birds[key].flapping.total
         );
         animation.frameDelay = 10;
-        this.group.addAni(key, animation);
+        this.group.addAni(`${key}_flapping`, animation);
+      }
+
+      for (const key of Object.keys(ANIMATIONS.birds)) {
+        let animation = p5.loadAnimation(
+          ANIMATIONS.birds[key].die.first,
+          ANIMATIONS.birds[key].die.total
+        );
+        animation.noLoop();
+        this.group.addAni(`${key}_die`, animation);
       }
 
       this.levelManager = l;
@@ -70,6 +96,13 @@ const sketch = (p5: p5Play) => {
       this.group.cull(0, 0, 0, 0, (sprite) => {
         sprite.remove();
         this.incrementBirdsPassed();
+      });
+      this.group.collides(this.group, async (s, s2) => {
+        let sAni = s.ani.name.replace("flapping", "die");
+        let s2Ani = s2.ani.name.replace("flapping", "die");
+        await Promise.all([s.changeAni(sAni)(), s2.changeAni(s2Ani)()]);
+        s.remove();
+        s2.remove();
       });
     }
 
@@ -96,7 +129,8 @@ const sketch = (p5: p5Play) => {
         g.direction = orientation.direction;
         g.speed = this.levelManager.config.planesSpeed;
         g.rotation = orientation.rotation;
-        g.ani = p5.random(Object.keys(ANIMATIONS.birds));
+        let birdColor = p5.random(Object.keys(ANIMATIONS.birds));
+        g.ani = `${birdColor}_flapping`;
       }, 1000 * this.levelManager.config.spawnRateSec);
     }
 

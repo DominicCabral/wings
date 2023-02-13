@@ -8,6 +8,7 @@ export class Group {
   draw();
   removeAll();
   collides(s: Sprite, f: (s: Sprite) => void);
+  collides(s: Group, f: (s: Sprite, s2: Sprite) => void);
   overlaps(g: Group);
   addAni(name: string, animation: any);
   cull(
