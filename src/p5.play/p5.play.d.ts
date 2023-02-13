@@ -52,6 +52,7 @@ export class Mouse {
 
 export class p5Play extends p5 {
   kb: any;
+  Canvas: any;
   createGroup(): Group;
   createSprite(x: number, y: number, w: number, h: number): Sprite;
 

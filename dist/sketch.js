@@ -14,39 +14,103 @@ const orientation_1 = require("./orientation");
 const levels_1 = require("./levels");
 const { load } = require("./p5.play/p5.play");
 // TODO:
-// - airplane hover sin wave
 // - sounds related to levels (birds from east, winds hard to control)
 // - explosion animation
 // - better displays for levels
 // - when getting to harder levels, animations change
 // - airplane animation banking
-let ANIMATIONS = {
-    birds: {
-        blue: {
-            flapping: {
-                first: "assets/birds/blue/flapping/000.png",
-                total: 9,
+// - more bird animations
+const sketch = (p5) => {
+    const ANIMATIONS = {
+        birds: {
+            blue: {
+                flapping: {
+                    first: "assets/birds/blue/flapping/000.png",
+                    total: 9,
+                },
+            },
+            brown: {
+                flapping: {
+                    first: "assets/birds/brown/flapping/__brown_bird_flapping_000.png",
+                    total: 9,
+                },
+            },
+            canary: {
+                flapping: {
+                    first: "assets/birds/canary/flapping/__canary_flapping_000.png",
+                    total: 9,
+                },
+            },
+            green: {
+                flapping: {
+                    first: "assets/birds/green/flapping/__green_flapping_000.png",
+                    total: 9,
+                },
             },
         },
-    },
-};
-const sketch = (p5) => {
+    };
+    class Birds {
+        constructor(l) {
+            this.birdsPassedTotal = 0;
+            this.birdsPassedThisLevel = 0;
+            this.spriteGroup = p5.createGroup();
+            for (const key of Object.keys(ANIMATIONS.birds)) {
+                let animation = p5.loadAnimation(ANIMATIONS.birds[key].flapping.first, ANIMATIONS.birds[key].flapping.total);
+                animation.frameDelay = 10;
+                this.group.addAni(key, animation);
+            }
+            this.levelManager = l;
+            this.startBirdSpawning();
+        }
+        draw() {
+            this.group.draw();
+            this.group.cull(0, 0, 0, 0, (sprite) => {
+                sprite.remove();
+                this.incrementBirdsPassed();
+            });
+        }
+        reset() {
+            clearInterval(this.birdSpawnTimer);
+            this.group.removeAll();
+            this.birdsPassedTotal = 0;
+            this.birdsPassedThisLevel = 0;
+            this.startBirdSpawning();
+        }
+        startBirdSpawning() {
+            this.birdSpawnTimer = setInterval(() => {
+                let orientation = (0, orientation_1.orientationConfig)(p5)[p5.random(this.levelManager.config.birdSpawnDirections)];
+                let g = new this.group.GroupSprite(orientation.x(), orientation.y(), 25);
+                g.direction = orientation.direction;
+                g.speed = this.levelManager.config.planesSpeed;
+                g.rotation = orientation.rotation;
+                g.ani = p5.random(Object.keys(ANIMATIONS.birds));
+            }, 1000 * this.levelManager.config.spawnRateSec);
+        }
+        incrementBirdsPassed() {
+            this.birdsPassedTotal++;
+            this.birdsPassedThisLevel++;
+            if (this.birdsPassedThisLevel == this.levelManager.config.birdsToPass) {
+                this.birdsPassedThisLevel = 0;
+                this.passedLevelCb();
+            }
+        }
+        get passedTotal() {
+            return this.birdsPassedTotal;
+        }
+        get passedThisLevel() {
+            return this.birdsPassedThisLevel;
+        }
+        get group() {
+            return this.spriteGroup;
+        }
+    }
     class Game {
-        constructor(levels) {
+        constructor(levelManager) {
             this.isGameOver = false;
             this.gameStarted = false;
-            this.currentLevel = 0;
-            this.planesPassedTotal = 0;
-            this.planesPassedThisLevel = 0;
-            if (levels.length == 0) {
-                throw Error("Not enought levels");
-            }
-            this.levels = levels;
-            let blueBirdAnimation = p5.loadAnimation(ANIMATIONS.birds.blue.flapping.first, ANIMATIONS.birds.blue.flapping.total);
             let redPlaneAnimation = p5.loadAnimation("assets/plane/red/nobank/1.png", 6);
-            blueBirdAnimation.frameDelay = 10;
-            this.blueBirdAnimation = blueBirdAnimation;
             this.redPlaneAnimation = redPlaneAnimation;
+            this.levelManager = levelManager;
         }
         set modal(s) {
             p5.fill(255);
@@ -60,21 +124,21 @@ const sketch = (p5) => {
             p5.rect(0, 0, 100, 50);
             p5.textAlign(p5.CENTER, p5.CENTER);
             p5.fill(0);
-            p5.text(`Level: ${this.currentLevel + 1}`, 0, 0, 100, 50);
+            p5.text(`Level: ${this.levelManager.level + 1}`, 0, 0, 100, 50);
         }
-        displayPlanesPassedTotal() {
+        displayBirdsPassedTotal() {
             p5.fill(255);
             p5.rect(100, 0, 100, 50);
             p5.textAlign(p5.CENTER, p5.CENTER);
             p5.fill(0);
-            p5.text(`Planes Passed: ${this.planesPassedTotal}`, 100, 0, 100, 50);
+            p5.text(`Birds Passed: ${this.birds.passedTotal}`, 100, 0, 100, 50);
         }
-        displayPlanesPassedThisLevel() {
+        displayBirdsPassedThisLevel() {
             p5.fill(255);
             p5.rect(200, 0, 100, 50);
             p5.textAlign(p5.CENTER, p5.CENTER);
             p5.fill(0);
-            p5.text(`Passed This Level: ${this.planesPassedThisLevel}/${this.config.planesToPass}`, 200, 0, 100, 50);
+            p5.text(`Passed This Level: ${this.birds.passedThisLevel}/${this.levelManager.config.birdsToPass}`, 200, 0, 100, 50);
         }
         draw() {
             if (this.isGameOver || !this.gameStarted) {
@@ -84,46 +148,20 @@ const sketch = (p5) => {
             p5.background("#87ceeb");
             this.clouds.draw();
             this.displayLevel();
-            this.displayPlanesPassedTotal();
-            this.displayPlanesPassedThisLevel();
+            this.displayBirdsPassedTotal();
+            this.displayBirdsPassedThisLevel();
             this.player.draw();
             this.birds.draw();
-            this.player.moveTowards(p5.mouseX, p5.mouseY - 75, this.config.playerSpeed);
-            this.player.collides(this.birds, () => {
+            this.player.moveTowards(p5.mouseX, p5.mouseY - 75, this.levelManager.config.playerSpeed);
+            this.player.collides(this.birds.group, () => {
                 this.endGame();
             });
-            this.birds.cull(0, 0, 0, 0, (sprite) => {
-                sprite.remove();
-                this.incPlanesPassed();
-            });
-        }
-        get config() {
-            return this.levels[this.currentLevel];
-        }
-        incPlanesPassed() {
-            this.planesPassedTotal++;
-            this.planesPassedThisLevel++;
-            if (this.planesPassedThisLevel == this.config.planesToPass) {
-                this.nextLevel();
-            }
-        }
-        nextLevel() {
-            if (this.isGameOver) {
-                return;
-            }
-            // Next Level
-            if (this.levels.length == this.currentLevel + 1) {
-                this.endGame();
-                return;
-            }
-            this.currentLevel++;
-            this.planesPassedThisLevel = 0;
+            this.player.ani.scale = 0.1 * p5.sin(p5.millis() / 10) + 1; // hover effect
         }
         requestToStart() {
             if (this.isGameOver) {
-                this.birds.removeAll();
+                this.birds.reset();
                 this.isGameOver = false;
-                this.startPlaneSpawning();
                 this.startCloudSpawning();
                 return;
             }
@@ -139,50 +177,42 @@ const sketch = (p5) => {
             return player;
         }
         start() {
-            this.birds = p5.createGroup();
-            this.birds.addAni("fly", this.blueBirdAnimation);
+            this.birds = new Birds(this.levelManager);
+            this.birds.passedLevelCb = () => {
+                if (!this.levelManager.levelUp()) {
+                    this.endGame();
+                }
+            };
             this.player = this.createPlayer();
             this.clouds = p5.createGroup();
             this.player.overlaps(this.clouds);
-            this.birds.overlaps(this.clouds);
+            this.birds.group.overlaps(this.clouds);
             this.gameStarted = true;
-            this.birds.debug = p5.kb.presses("d");
-            this.player.debug = p5.kb.presses("d");
-            this.startPlaneSpawning();
+            this.birds.group.debug = p5.kb.pressing("d");
+            this.player.debug = p5.kb.pressing("d");
             this.startCloudSpawning();
         }
         endGame() {
             console.log("GAME OVER");
             this.isGameOver = true;
-            this.currentLevel = 0;
-            this.planesPassedTotal = 0;
-            this.planesPassedThisLevel = 0;
-            clearInterval(this.birdSpawnTimer);
+            this.levelManager.reset();
             clearInterval(this.cloudSpawnTimer);
-        }
-        startPlaneSpawning() {
-            this.birdSpawnTimer = setInterval(() => {
-                let orientation = (0, orientation_1.orientationConfig)(p5)[p5.random(this.config.birdSpawnDirections)];
-                let g = new this.birds.GroupSprite(orientation.x(), orientation.y(), 25);
-                g.direction = orientation.direction;
-                g.speed = this.config.planesSpeed;
-                g.rotation = orientation.rotation;
-            }, 1000 * this.config.spawnRateSec);
         }
         startCloudSpawning() {
             this.cloudSpawnTimer = setInterval(() => {
                 let g = p5.createSprite(p5.random(0, p5.width), -100, 100);
                 g.direction = 90;
-                g.speed = this.config.planesSpeed / 2;
+                g.speed = this.levelManager.config.planesSpeed / 2;
                 g.img = "assets/cloud.png";
                 g.rotation = 90;
                 this.clouds.push(g);
-            }, 1000 * this.config.spawnRateSec * 2);
+            }, 1000 * this.levelManager.config.spawnRateSec * 2);
         }
     }
-    let game = new Game(levels_1.DEFAULT_LEVELS);
+    let lm = new levels_1.LevelManager(levels_1.DEFAULT_LEVELS);
+    let game = new Game(lm);
     p5.setup = () => {
-        p5.createCanvas(p5.windowWidth, p5.windowHeight);
+        new p5.Canvas("9:19.5");
     };
     p5.draw = () => {
         game.draw();
@@ -200,48 +230,81 @@ new p5_1.default(sketch);
 },{"./levels":3,"./orientation":4,"./p5.play/p5.play":5,"p5":1}],3:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_LEVELS = void 0;
+exports.DEFAULT_LEVELS = exports.LevelManager = void 0;
+class LevelManager {
+    constructor(l) {
+        this.currentLevel = 0;
+        this.levelUpListeners = [];
+        if (l.length == 0) {
+            throw Error("Not enought levels");
+        }
+        this.levels = l;
+    }
+    addLevelUpListener(cb) {
+        this.levelUpListeners.push(cb);
+    }
+    levelUp() {
+        if (this.levels.length == this.currentLevel + 1) {
+            return false;
+        }
+        this.currentLevel++;
+        this.levelUpListeners.forEach((cb) => {
+            cb();
+        });
+        return true;
+    }
+    reset() {
+        this.currentLevel = 0;
+    }
+    get level() {
+        return this.currentLevel;
+    }
+    get config() {
+        return this.levels[this.currentLevel];
+    }
+}
+exports.LevelManager = LevelManager;
 exports.DEFAULT_LEVELS = [
     {
         playerSpeed: 0.1,
         planesSpeed: 4,
         spawnRateSec: 0.5,
-        planesToPass: 25,
+        birdsToPass: 25,
         birdSpawnDirections: ["north"],
     },
     {
         playerSpeed: 0.08,
         planesSpeed: 5,
         spawnRateSec: 0.1,
-        planesToPass: 25,
+        birdsToPass: 25,
         birdSpawnDirections: ["north"],
     },
     {
         playerSpeed: 0.06,
         planesSpeed: 6,
         spawnRateSec: 0.07,
-        planesToPass: 25,
+        birdsToPass: 25,
         birdSpawnDirections: ["north", "east"],
     },
     {
         playerSpeed: 0.04,
         planesSpeed: 7,
         spawnRateSec: 0.03,
-        planesToPass: 25,
+        birdsToPass: 25,
         birdSpawnDirections: ["north", "east"],
     },
     {
         playerSpeed: 0.03,
         planesSpeed: 8,
         spawnRateSec: 0.005,
-        planesToPass: 25,
+        birdsToPass: 25,
         birdSpawnDirections: ["north", "east", "west"],
     },
     {
         playerSpeed: 0.01,
         planesSpeed: 10,
         spawnRateSec: 0.001,
-        planesToPass: 25,
+        birdsToPass: 25,
         birdSpawnDirections: ["north", "east", "west", "south"],
     },
 ];
