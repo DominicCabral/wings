@@ -31,19 +31,19 @@ const sketch = (p5) => {
             },
             brown: {
                 flapping: {
-                    first: "assets/birds/brown/flapping/__brown_bird_flapping_000.png",
+                    first: "assets/birds/brown/flapping/000.png",
                     total: 9,
                 },
             },
             canary: {
                 flapping: {
-                    first: "assets/birds/canary/flapping/__canary_flapping_000.png",
+                    first: "assets/birds/canary/flapping/000.png",
                     total: 9,
                 },
             },
             green: {
                 flapping: {
-                    first: "assets/birds/green/flapping/__green_flapping_000.png",
+                    first: "assets/birds/green/flapping/000.png",
                     total: 9,
                 },
             },
